@@ -82,14 +82,15 @@ verbatim — that citation is what makes the output auditable.
 }
 ```
 
-### Deviation from `project-brief.md` §3.3
+### Why `effectiveDate` sits at the root
 
-The brief's contract has only `eventId` and `actions[]`, but states the rule *"`deadline` must be
-on or after the event's `effectiveDate`."* That rule is unenforceable without `effectiveDate` in
-the payload — the Java service would have to trust a date it never received.
+The obvious contract is just `eventId` plus `actions[]`, with each action carrying its own
+deadline. That version cannot enforce its own most important rule — *"`deadline` must be on or
+after the event's `effectiveDate`"* — because the Java service never receives `effectiveDate`
+and would have to trust a date it cannot check.
 
-**We add `effectiveDate` and `eventType` to the root.** This makes the service self-contained and
-unlocks a materially stronger check than the brief proposed:
+**So `effectiveDate` and `eventType` live at the root.** This makes the service self-contained
+and unlocks a materially stronger check:
 
 ```
 deadline == effectiveDate + deadlineRuleDays

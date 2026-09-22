@@ -17,3 +17,10 @@ java-service/target/
 # Scratch
 *.log
 tmp/
+
+# Local working notes — intentionally not published
+CLAUDE.md
+PLAN.md
+PROGRESS.md
+project-brief.md
+.claude/

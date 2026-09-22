@@ -1,0 +1,237 @@
+{
+  "name": "HR Compliance — Runtime",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "a1533de1-da3b-40b4-8c97-b82ef4b29616",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-620, 0],
+      "webhookId": "bcbc855d-579c-41a9-ac77-24d8b666adb4",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hr-event",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "bece32a2-e188-4382-afca-618ba72069cb",
+      "name": "Build Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 0],
+      "parameters": {
+        "jsCode": "// Province goes in the query text on purpose: it is what makes retrieval pick\n// Quebec's final-pay clause over Ontario's rather than the model guessing.\nconst event = $input.first().json.body ?? {};\nconst meta = Object.entries(event.metadata ?? {})\n  .map(([k, v]) => `${k} ${v}`)\n  .join(' ');\n\nreturn [{\n  json: {\n    query: `${event.eventType ?? ''} ${meta} province ${event.province ?? ''} — required actions, notices, deadlines`.trim(),\n  },\n}];"
+      }
+    },
+    {
+      "id": "16d0da73-e140-4568-9ab4-2afa53a2c59e",
+      "name": "Retrieve Policy Clauses",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [-180, 0],
+      "parameters": {
+        "mode": "load",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "hr_policies"
+        },
+        "prompt": "={{ $json.query }}",
+        "topK": 3,
+        "includeDocumentMetadata": true
+      }
+    },
+    {
+      "id": "5f9442ef-b339-4117-b844-ee147a6066d1",
+      "name": "Embeddings Google Gemini",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [-260, 220],
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "JsG3RwahegrJknx0",
+          "name": "Gemini - HR Agent"
+        }
+      }
+    },
+    {
+      "id": "6fe4352d-28dc-459a-9591-b246c2ae01d6",
+      "name": "Assemble Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 0],
+      "parameters": {
+        "jsCode": "// The vector store emits one item per retrieved chunk. Collapsing them into a\n// single item here is what keeps the LLM chain to ONE call instead of three.\nconst event = $('Webhook').first().json.body ?? {};\n\nconst excerpts = $input.all().map((item, i) => {\n  const doc = item.json.document ?? item.json;\n  const source = doc.metadata?.sourceDocument ?? 'unknown';\n  return `[Excerpt ${i + 1}] sourceDocument: ${source}\\n${doc.pageContent ?? ''}`;\n}).join('\\n\\n');\n\nconst prompt = [\n  'You are an HR compliance assistant.',\n  '',\n  'EVENT',\n  `  eventType:     ${event.eventType ?? ''}`,\n  `  employeeId:    ${event.employeeId ?? ''}`,\n  `  effectiveDate: ${event.effectiveDate ?? ''}`,\n  `  province:      ${event.province ?? ''}`,\n  `  metadata:      ${JSON.stringify(event.metadata ?? {})}`,\n  '',\n  'RETRIEVED POLICY EXCERPTS',\n  excerpts || '(none retrieved)',\n  '',\n  'RULES',\n  '- Use ONLY the excerpts above. Do not apply outside knowledge of employment law.',\n  '- Every action must quote the clause it rests on verbatim in sourceClause, and name the',\n  '  sourceDocument it came from exactly as given above.',\n  '- If the excerpts do not clearly cover this event, return an empty actions array.',\n  '  Returning nothing is correct; inventing an action is not.',\n  '- deadlineRuleDays is the day offset stated in the clause. Set deadline to exactly',\n  `  ${event.effectiveDate ?? 'the effective date'} plus that many days.`,\n  '- When a clause is province-specific, use the one matching the event province.',\n  `- Set eventId to \"${event.employeeId ?? ''}-${event.effectiveDate ?? ''}\".`,\n  `- Set eventType to \"${event.eventType ?? ''}\" and effectiveDate to \"${event.effectiveDate ?? ''}\".`,\n  '- confidence (0-1) should reflect how directly the cited clause covers this event.',\n].join('\\n');\n\nreturn [{ json: { prompt } }];"
+      }
+    },
+    {
+      "id": "f24d1a9a-ed36-4ddb-a4b2-c767051d2578",
+      "name": "Draft Action Plan",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [260, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "hasOutputParser": true
+      }
+    },
+    {
+      "id": "5112480d-af91-4f96-bc28-785cc209f245",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [180, 220],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "jUbaP35H1wP9raAT",
+          "name": "Anthropic - HR Agent"
+        }
+      }
+    },
+    {
+      "id": "34731088-b3a4-4d62-a2db-ea19b27f6751",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [400, 220],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"required\": [\"eventId\", \"eventType\", \"effectiveDate\", \"actions\"],\n  \"properties\": {\n    \"eventId\": { \"type\": \"string\", \"description\": \"employeeId-effectiveDate\" },\n    \"eventType\": { \"type\": \"string\" },\n    \"effectiveDate\": { \"type\": \"string\", \"description\": \"ISO date YYYY-MM-DD\" },\n    \"actions\": {\n      \"type\": \"array\",\n      \"description\": \"Empty array when the excerpts do not cover the event\",\n      \"items\": {\n        \"type\": \"object\",\n        \"required\": [\"actionType\", \"deadline\", \"deadlineRuleDays\", \"sourceClause\", \"sourceDocument\", \"confidence\"],\n        \"properties\": {\n          \"actionType\": {\n            \"type\": \"string\",\n            \"enum\": [\"send_continuation_notice\", \"end_benefits\", \"issue_final_paycheck\", \"request_asset_return\", \"notify_manager\", \"flag_leave_request\", \"schedule_return_to_work_check\", \"open_benefits_enrollment\", \"schedule_benefits_review\"]\n          },\n          \"deadline\": { \"type\": \"string\", \"description\": \"ISO date, equal to effectiveDate plus deadlineRuleDays\" },\n          \"deadlineRuleDays\": { \"type\": \"integer\", \"description\": \"Day offset stated in the cited clause\" },\n          \"sourceClause\": { \"type\": \"string\", \"description\": \"Verbatim text of the clause\" },\n          \"sourceDocument\": {\n            \"type\": \"string\",\n            \"enum\": [\"termination.md\", \"leave-policy.md\", \"benefits-eligibility.md\"]\n          },\n          \"confidence\": { \"type\": \"number\" }\n        }\n      }\n    }\n  }\n}"
+      }
+    },
+    {
+      "id": "e5c974f8-b356-488d-893b-230d55680e04",
+      "name": "POST to Java Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [560, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8080/api/action-plans",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.output) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "1b6e9d0a-4f2c-4a71-9c3e-7d5a8b1e4f60",
+      "name": "Accepted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [780, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "status-201",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 201,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2c7f0e1b-5a3d-4b82-8e4f-9a6c2d3f5071",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1000, -100],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": 201
+        }
+      }
+    },
+    {
+      "id": "3d8a1f2c-6b4e-4c93-9f50-0b7d3e4a6182",
+      "name": "Respond Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1000, 100],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": 422
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Build Query", "type": "main", "index": 0 }]]
+    },
+    "Build Query": {
+      "main": [[{ "node": "Retrieve Policy Clauses", "type": "main", "index": 0 }]]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [[{ "node": "Retrieve Policy Clauses", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Retrieve Policy Clauses": {
+      "main": [[{ "node": "Assemble Prompt", "type": "main", "index": 0 }]]
+    },
+    "Assemble Prompt": {
+      "main": [[{ "node": "Draft Action Plan", "type": "main", "index": 0 }]]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [[{ "node": "Draft Action Plan", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [[{ "node": "Draft Action Plan", "type": "ai_outputParser", "index": 0 }]]
+    },
+    "Draft Action Plan": {
+      "main": [[{ "node": "POST to Java Service", "type": "main", "index": 0 }]]
+    },
+    "POST to Java Service": {
+      "main": [[{ "node": "Accepted?", "type": "main", "index": 0 }]]
+    },
+    "Accepted?": {
+      "main": [
+        [{ "node": "Respond Accepted", "type": "main", "index": 0 }],
+        [{ "node": "Respond Rejected", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}

@@ -3,8 +3,8 @@
 A RAG pipeline that grounds AI-generated HR compliance actions in source policy text, with a
 deterministic Java validation layer separating AI proposal from execution.
 
-> **Status:** work in progress. The Java validation layer is complete and verified; the n8n
-> workflows are in build. See [Current state](#current-state).
+> **Status:** working end to end. `./scripts/test-e2e.sh` passes 13/13 — four HR events through
+> the full RAG pipeline, plus five adversarial cases against the validation layer.
 
 ---
 
@@ -98,8 +98,35 @@ Every case below is verified:
 | `confidence: 0.42` | Confidence routing | 201, queued for review, **not executed** |
 | Event no policy covers | Prompt instruction | `actions: []` — correct, not a failure |
 | Malformed JSON | Parse guard | 400 |
+| Deadline before `effectiveDate` | Java semantic check | 400 |
 
 Errors are reported as a list, not first-failure, so one round trip surfaces every problem.
+
+---
+
+## Retrieval is doing real work
+
+The clearest evidence: two identical termination events differing only in `province` cite
+**different clauses** from the same document.
+
+| `province` | Clause cited for `issue_final_paycheck` |
+|---|---|
+| `QC` | *"In Quebec, all accrued and unused vacation pay must be included in the final paycheque and paid within 7 days…"* |
+| `ON` | *"In Ontario, outstanding wages including accrued vacation pay must be paid by the later of 7 days after employment ends…"* |
+
+The province is part of the embedded query, so the right provincial clause is *retrieved* rather
+than recalled from the model's training data.
+
+### An honest limitation
+
+On the leave-request event, `flag_leave_request` cited Clause 3.1 (medical certificate, 2 days)
+instead of Clause 2.1 (flag the request, 2 days). Both specify 2 days, so the deadline is
+correct — but the citation points at the wrong clause.
+
+That mis-grounding is only visible **because every action must carry a `sourceClause`.** Without
+the citation requirement it would have passed unnoticed as a correct-looking answer. Making the
+model show its sources turns a silent error into an observable one, which is the same argument
+the deadline check makes.
 
 ---
 
@@ -119,10 +146,19 @@ cd java-service && ./mvnw spring-boot:run          # :8080
 #      "Gemini - HR Agent"     (Google Gemini(PaLM) Api)
 #      "Anthropic - HR Agent"  (Anthropic)
 
-# 4. Import the workflows from n8n/, run the indexing workflow once, then:
+# 4. Import both workflows from n8n/ and activate them, then run everything:
+./scripts/test-e2e.sh
+
+# Or fire a single event:
 curl -s -X POST http://localhost:5678/webhook/hr-event \
   -H 'Content-Type: application/json' \
   -d @sample-events/termination-event.json | jq
+```
+
+The vector store is in-process memory, so **re-index after any container restart**:
+
+```bash
+curl -s -X POST http://localhost:5678/webhook/reindex-policies -d '{}'
 ```
 
 API keys live only inside n8n as credentials and are never stored in this repo.
@@ -150,8 +186,8 @@ API keys live only inside n8n as credentials and are never stored in this repo.
 | ✅ | Policies mounted into the n8n container (read-only) |
 | ✅ | **Java validation + execution service — complete and verified** |
 | ✅ | **n8n indexing workflow — 11 chunks indexed, every chunk carries its source citation** |
-| 🔜 | n8n runtime workflow |
-| 🔜 | End-to-end and adversarial test scripts |
+| ✅ | **n8n runtime workflow — webhook to receipt in ~4.6s** |
+| ✅ | **End-to-end test suite — 13/13 passing** |
 
 ---
 

@@ -182,7 +182,7 @@ API keys live only inside n8n as credentials and are never stored in this repo.
 | `java-service/` | Spring Boot validation + execution service |
 | `n8n/` | Exported workflow JSON |
 | `sample-events/` | Happy paths plus an event no policy covers |
-| `docs/` | [architecture](docs/architecture.md) · [data flow](docs/data-flow.md) · [JSON contracts](docs/json-contracts.md) |
+| `docs/` | [walkthrough](docs/walkthrough.md) · [architecture](docs/architecture.md) · [data flow](docs/data-flow.md) · [JSON contracts](docs/json-contracts.md) |
 | `scripts/` | Container setup and the end-to-end test suite |
 
 ---

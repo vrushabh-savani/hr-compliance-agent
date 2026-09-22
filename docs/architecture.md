@@ -120,6 +120,15 @@ inside n8n. Two consequences:
 2. **It does not survive a container restart.** After `docker restart n8n`, re-run the indexing
    workflow before anything else will work.
 
+   The runtime workflow treats an empty store as a distinct condition rather than letting it
+   pass as "no relevant policy". Without that guard the failure is silent in the worst way:
+   zero retrieved chunks skips every downstream node, the webhook never responds, and the
+   execution is still recorded as `success`. It now returns a 503 naming the re-index command.
+
+3. **Workflows must be *published*, not merely *activated*.** Activation registers a webhook in
+   the running n8n process; publishing persists it and re-registers on boot. A workflow that is
+   only activated returns 404 after the first restart.
+
 For production this would be PGVector or Qdrant. For a portfolio demo of the RAG pattern the
 in-memory store is the right call — it keeps the dependency count at zero and the failure mode
 is loud and easily explained.

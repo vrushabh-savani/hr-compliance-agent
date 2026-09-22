@@ -60,36 +60,63 @@ Webhook  POST /hr-event                       typeVersion 2.1
   responseMode: responseNode
       │ main
       ▼
-Simple Vector Store   mode: load              typeVersion 1.3
+Build Query                                    n8n-nodes-base.code v2
+  eventType + metadata + province → one query string
+      │ main
+      ▼
+Retrieve Policy Clauses   mode: load           typeVersion 1.3
   memoryKey: hr_policies   topK: 3
-  prompt: built from eventType + province + metadata
   includeDocumentMetadata: true
+  alwaysOutputData: true   ← so an empty store yields an item, not silence
       ▲ ai_embedding
       │
 Embeddings Gemini  (same model as indexing — non-negotiable)
       │
-      │ main  → 3 chunks with text + sourceDocument
+      │ main  → 3 chunks, or one empty item if the store is cold
       ▼
-Basic LLM Chain                                typeVersion 1.9
+Assemble Prompt                                n8n-nodes-base.code v2
+  collapses N chunks into ONE item  ← or the chain runs once per chunk
+  sets storeEmpty when nothing usable came back
+      │ main
+      ▼
+IF  Policies Indexed?                          typeVersion 2.3
+      ├── storeEmpty == true ──► Respond Not Indexed   (HTTP 503)
+      └── false ─┐
+                 ▼
+Draft Action Plan                              typeVersion 1.9
   hasOutputParser: true
-  prompt: event + retrieved clauses + rules
+  text: the prompt assembled above
       ▲                      ▲
       │ ai_languageModel     │ ai_outputParser
       │                      │
 Anthropic Chat Model    Structured Output Parser
-claude-sonnet-5         schema = action-plan-schema.json
+claude-sonnet-5         schema mirrors action-plan-schema.json
       │
       │ main  → validated-shape action plan
       ▼
 POST to Java Service                           typeVersion 4.5
   http://host.docker.internal:8080/api/action-plans
-  neverError: true  ← must not throw on 400, we branch on it
+  fullResponse + neverError  ← must not throw on 400, we branch on it
       │ main
       ▼
-IF  statusCode == 201                          typeVersion 2.3
-      ├── true  ──► Respond Success   (receipt)
-      └── false ──► Respond Rejected  (error list, HTTP 422)
+IF  Accepted?  statusCode == 201                typeVersion 2.3
+      ├── true  ──► Respond Accepted   (receipt, HTTP 201)
+      └── false ──► Respond Rejected   (error list, HTTP 422)
 ```
+
+### Three nodes that look like plumbing and are not
+
+**`Assemble Prompt`** — the vector store emits **one item per retrieved chunk**. Wiring it
+straight into the chain runs Claude once per chunk: three API calls and three competing plans
+for one event. This node collapses them into a single item first.
+
+**`Policies Indexed?`** — the in-memory store is wiped by every n8n restart. Without this
+branch, zero retrieved chunks means every downstream node is skipped, the webhook never
+responds, and the execution is still logged as **`success`**. The branch turns that silence
+into a 503 naming the re-index command.
+
+**`alwaysOutputData: true`** on the retrieval node is what makes the branch reachable at all —
+a node emitting zero items ends the run before any guard can fire.
 
 ### The embedding-model rule
 
@@ -190,8 +217,9 @@ These are the behaviours worth demonstrating — each one shows a layer doing it
 | Correct clause, wrong date arithmetic | **Java semantic check** | 400 with expected vs. actual date |
 | Deadline before `effectiveDate` | Java semantic check | 400 |
 | Low-confidence action | Java confidence routing | 201, action queued for review not executed |
-| Vector store empty after restart | Retrieval returns nothing | `actions: []` — re-run indexing |
+| Vector store empty after restart | `Policies Indexed?` guard | **503** naming the re-index command |
 | Java service down | HTTP node, `neverError` | IF false branch, 422 with the connection error |
+| Webhook returns 404 after a restart | Workflow activated but not **published** | Publish it — activation lives only in the running process |
 
 The fourth row is the one to point at. Everything above it could be caught by a decent output
 parser; recomputing the deadline needs an independent deterministic layer, which is the argument

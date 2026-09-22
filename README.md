@@ -146,7 +146,8 @@ cd java-service && ./mvnw spring-boot:run          # :8080
 #      "Gemini - HR Agent"     (Google Gemini(PaLM) Api)
 #      "Anthropic - HR Agent"  (Anthropic)
 
-# 4. Import both workflows from n8n/ and activate them, then run everything:
+# 4. Import both workflows from n8n/ and PUBLISH them (activate alone does not survive
+#    a restart — see n8n/README.md), then run everything:
 ./scripts/test-e2e.sh
 
 # Or fire a single event:
@@ -159,6 +160,14 @@ The vector store is in-process memory, so **re-index after any container restart
 
 ```bash
 curl -s -X POST http://localhost:5678/webhook/reindex-policies -d '{}'
+```
+
+Forget to, and the pipeline says so rather than failing quietly:
+
+```json
+{ "error": "vector store is empty",
+  "detail": "No policy chunks are indexed. The in-memory store does not survive an
+             n8n restart. Run: curl -X POST .../webhook/reindex-policies -d '{}'" }
 ```
 
 API keys live only inside n8n as credentials and are never stored in this repo.

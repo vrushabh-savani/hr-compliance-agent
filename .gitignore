@@ -1,0 +1,19 @@
+# Secrets — never commit
+.env
+*.key
+
+# Java
+java-service/target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Scratch
+*.log
+tmp/

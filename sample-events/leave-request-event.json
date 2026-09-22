@@ -1,0 +1,11 @@
+{
+  "eventType": "leave_request",
+  "employeeId": "EMP-2041",
+  "effectiveDate": "2026-10-05",
+  "province": "ON",
+  "metadata": {
+    "leaveType": "medical",
+    "expectedDurationDays": 45,
+    "department": "sales"
+  }
+}

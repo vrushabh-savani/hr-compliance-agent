@@ -1,0 +1,10 @@
+{
+  "eventType": "termination",
+  "employeeId": "EMP-1155",
+  "effectiveDate": "2026-11-14",
+  "province": "ON",
+  "metadata": {
+    "reason": "involuntary",
+    "department": "marketing"
+  }
+}

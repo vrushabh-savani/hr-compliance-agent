@@ -1,0 +1,10 @@
+{
+  "eventType": "termination",
+  "employeeId": "EMP-1023",
+  "effectiveDate": "2026-09-30",
+  "province": "QC",
+  "metadata": {
+    "reason": "voluntary",
+    "department": "engineering"
+  }
+}

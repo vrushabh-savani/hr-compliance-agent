@@ -1,0 +1,13 @@
+{
+  "eventType": "benefits_change",
+  "employeeId": "EMP-3307",
+  "effectiveDate": "2026-10-01",
+  "province": "ON",
+  "metadata": {
+    "changeReason": "status_change",
+    "fromStatus": "full_time",
+    "toStatus": "part_time",
+    "newWeeklyHours": 24,
+    "department": "operations"
+  }
+}

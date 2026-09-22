@@ -1,0 +1,12 @@
+{
+  "eventType": "relocation_request",
+  "employeeId": "EMP-4412",
+  "effectiveDate": "2026-12-01",
+  "province": "BC",
+  "metadata": {
+    "fromOffice": "Toronto",
+    "toOffice": "Vancouver",
+    "relocationAllowanceRequested": true,
+    "department": "finance"
+  }
+}

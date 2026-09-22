@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vrushabh.dev/hr-compliance/action-plan.schema.json",
+  "title": "HR Compliance Action Plan",
+  "description": "A policy-grounded action plan drafted by an LLM from retrieved HR policy text. Every action must cite the clause it derives from.",
+  "type": "object",
+  "required": ["eventId", "eventType", "effectiveDate", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the originating event, conventionally employeeId-effectiveDate."
+    },
+    "eventType": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The HR lifecycle event that triggered this plan."
+    },
+    "effectiveDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "ISO date the event takes effect. Every deadline is computed from this anchor."
+    },
+    "actions": {
+      "type": "array",
+      "description": "Required actions. An empty array is valid and correct when the retrieved policy text does not cover the situation.",
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "required": [
+        "actionType",
+        "deadline",
+        "deadlineRuleDays",
+        "sourceClause",
+        "sourceDocument",
+        "confidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "actionType": {
+          "type": "string",
+          "description": "Must be one of the known action types. Unknown values are rejected rather than coerced.",
+          "enum": [
+            "send_continuation_notice",
+            "end_benefits",
+            "issue_final_paycheck",
+            "request_asset_return",
+            "notify_manager",
+            "flag_leave_request",
+            "schedule_return_to_work_check",
+            "open_benefits_enrollment",
+            "schedule_benefits_review"
+          ]
+        },
+        "deadline": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO date by which the action must be completed. Must equal effectiveDate plus deadlineRuleDays."
+        },
+        "deadlineRuleDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650,
+          "description": "The day offset stated in the cited policy clause. Recorded separately from the computed deadline so the arithmetic can be independently verified."
+        },
+        "sourceClause": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Verbatim text of the policy clause this action derives from. Without a citation an action cannot be executed."
+        },
+        "sourceDocument": {
+          "type": "string",
+          "description": "Filename of the policy document containing the cited clause.",
+          "enum": [
+            "termination.md",
+            "leave-policy.md",
+            "benefits-eligibility.md"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Model confidence. Actions below 0.7 are routed to manual review rather than executed."
+        }
+      }
+    }
+  }
+}

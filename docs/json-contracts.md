@@ -150,10 +150,20 @@ validation error.
   "executed": 2,
   "needsReview": 0,
   "executionLog": [
-    "Would send continuation notice to EMP-1023 by 2026-10-14 (termination.md)",
-    "Would end benefits for EMP-1023 on 2026-10-30 (termination.md)"
-  ]
+    "Would send benefits continuation notice for EMP-1023-2026-09-30 by 2026-10-14 (termination.md)",
+    "Would end benefits coverage for EMP-1023-2026-09-30 by 2026-10-30 (termination.md)"
+  ],
+  "reviewQueue": []
 }
+```
+
+Actions below the confidence threshold appear in `reviewQueue` instead of `executionLog`, with
+the confidence appended:
+
+```json
+"reviewQueue": [
+  "Would notify the direct manager for EMP-55-2026-09-30 by 2026-10-01 (termination.md) [confidence 0.42 below 0.70]"
+]
 ```
 
 **400 Bad Request** — plan rejected. All errors are reported at once, not just the first:
@@ -163,9 +173,23 @@ validation error.
   "eventId": "EMP-1023-2026-09-30",
   "valid": false,
   "errors": [
-    "actions[0].actionType: 'send_cobra_notice' is not a recognised action type",
-    "actions[1].deadline: 2026-10-25 does not equal effectiveDate 2026-09-30 + 30 days (expected 2026-10-30)",
-    "actions[2].sourceClause: required but missing"
+    "$.actions[0].actionType: does not have a value in the enumeration [\"send_continuation_notice\", \"end_benefits\", ...]",
+    "$.actions[1]: required property 'sourceClause' not found"
+  ]
+}
+```
+
+Schema errors (`$.`-prefixed, from networknt) and semantic errors (plain path prefix, from
+`ActionPlanValidator`) are reported in separate passes. Semantic checks index into the tree
+directly, so they only run once the structure is known good — a payload with a schema error
+returns schema errors only, and re-submitting surfaces any arithmetic problems underneath:
+
+```json
+{
+  "eventId": "EMP-1023-2026-09-30",
+  "valid": false,
+  "errors": [
+    "actions[0].deadline: 2026-10-25 does not equal effectiveDate 2026-09-30 + 14 days (expected 2026-10-14)"
   ]
 }
 ```

@@ -168,10 +168,11 @@ are above 0.7, so all three execute.
   "executed": 3,
   "needsReview": 0,
   "executionLog": [
-    "Would send continuation notice to EMP-1023 by 2026-10-14 (termination.md)",
-    "Would issue final paycheque to EMP-1023 by 2026-10-07 (termination.md)",
-    "Would end benefits for EMP-1023 on 2026-10-30 (termination.md)"
-  ]
+    "Would send benefits continuation notice for EMP-1023-2026-09-30 by 2026-10-14 (termination.md)",
+    "Would issue final paycheque for EMP-1023-2026-09-30 by 2026-10-07 (termination.md)",
+    "Would end benefits coverage for EMP-1023-2026-09-30 by 2026-10-30 (termination.md)"
+  ],
+  "reviewQueue": []
 }
 ```
 

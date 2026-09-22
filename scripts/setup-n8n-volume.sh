@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Recreate the n8n container with policies/ bind-mounted read-only at /policies.
+# Recreate the n8n container with policies/ bind-mounted read-only at /home/node/policies.
 #
 # Docker cannot add a mount to a running container, so the container must be replaced.
 # This is safe: all n8n state (workflows, credentials, encryption key, API keys) lives in
@@ -17,6 +17,11 @@ CONTAINER="n8n"
 VOLUME="n8n_data"
 IMAGE="n8nio/n8n:latest"
 
+# Mounted under /home/node rather than /policies on purpose. On n8n Cloud the Read/Write File
+# node refuses any path outside /home/node/. Self-hosted has no such restriction, but using the
+# cloud-safe path costs nothing and keeps the workflow portable.
+MOUNT_PATH="/home/node/policies"
+
 if [[ ! -d "${POLICIES_DIR}" ]]; then
   echo "error: ${POLICIES_DIR} does not exist" >&2
   exit 1
@@ -31,7 +36,7 @@ fi
 
 echo "Volume '${VOLUME}' found — n8n state is safe."
 echo "Policies:  ${POLICIES_DIR}"
-echo "Mounting:  ${POLICIES_DIR} -> /policies (read-only)"
+echo "Mounting:  ${POLICIES_DIR} -> ${MOUNT_PATH} (read-only)"
 echo
 
 if docker inspect "${CONTAINER}" >/dev/null 2>&1; then
@@ -51,7 +56,7 @@ docker run -d \
   -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
   -e N8N_RUNNERS_ENABLED=true \
   -v "${VOLUME}:/home/node/.n8n" \
-  -v "${POLICIES_DIR}:/policies:ro" \
+  -v "${POLICIES_DIR}:${MOUNT_PATH}:ro" \
   "${IMAGE}"
 
 echo -n "Waiting for n8n to come up"
@@ -66,7 +71,7 @@ done
 echo
 
 echo "Policy files visible inside the container:"
-docker exec "${CONTAINER}" ls -1 /policies
+docker exec "${CONTAINER}" ls -1 "${MOUNT_PATH}"
 
 echo
 echo "Done. NOTE: the in-memory vector store was cleared by the restart —"

@@ -138,8 +138,9 @@ find two inputs that *should* retrieve differently, and prove they do.
 
 ## Quick start
 
-**Prerequisites:** Java 25 and Docker. Maven is *not* required — the wrapper ships with the
-project.
+**Prerequisites:** Java 25 and Docker. The build is Maven, but you don't need it installed — the
+Maven Wrapper (`mvnw`) ships with the project and fetches the pinned version (3.9.16) on first
+run.
 
 ```bash
 # 1. Validation service

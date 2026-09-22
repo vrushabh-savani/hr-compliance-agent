@@ -1,0 +1,50 @@
+# n8n Workflows
+
+> Workflow JSON is not exported yet — see [Current state](../README.md#current-state).
+
+Two workflows share one in-memory vector store.
+
+| File | Trigger | Purpose |
+|---|---|---|
+| `hr-compliance-indexing.json` | Manual | Read `/home/node/policies/*.md`, chunk, embed, insert |
+| `hr-compliance-runtime.json` | Webhook `POST /hr-event` | Retrieve top-3, draft plan, validate via Java, respond |
+
+## Importing
+
+**UI:** Workflows → Import from File.
+
+**API:**
+```bash
+set -a && . ../.env && set +a
+curl -s -X POST http://localhost:5678/api/v1/workflows \
+  -H "X-N8N-API-KEY: $N8N_API_KEY" -H 'Content-Type: application/json' \
+  -d @hr-compliance-indexing.json
+```
+
+The Public API is strict: `settings` is required, and `active` / `id` / `tags` are read-only on
+POST — sending them returns a 400. Activate separately via
+`POST /api/v1/workflows/{id}/activate`.
+
+## Credentials
+
+Referenced by ID; the workflow files contain no key material.
+
+| Node | Credential type | Name |
+|---|---|---|
+| Embeddings Google Gemini | `googlePalmApi` | `Gemini - HR Agent` |
+| Anthropic Chat Model | `anthropicApi` | `Anthropic - HR Agent` |
+
+If you import into a different n8n instance, create credentials with these types and re-point
+the nodes — the IDs in the JSON will not match.
+
+## Two things that will waste your time
+
+**The vector store node must stay at `typeVersion` 1.3.** Below 1.2, n8n namespaces the memory
+key per workflow (`${workflowId}__${key}`), so indexing and runtime get *separate* stores and
+retrieval silently returns nothing — no error, just empty results. Both nodes use
+`memoryKey: "hr_policies"`.
+
+**Re-run indexing after any container restart.** The store is in-process memory and does not
+survive `docker restart n8n`.
+
+Full node-by-node breakdown: [`../docs/data-flow.md`](../docs/data-flow.md).

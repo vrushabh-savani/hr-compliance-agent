@@ -24,7 +24,7 @@ rather than a silent error. That boundary is the whole point of the project.
 │  n8n 2.40.5  (Docker, localhost:5678)                                │
 │                                                                      │
 │  Workflow 1: INDEXING (manual, run once)                             │
-│    /policies/*.md ──► split ──► Gemini embed ──► in-memory store     │
+│    ~/.n8n-files/policies/*.md ─► split ─► Gemini embed ─► in-memory store │
 │                                                                      │
 │  Workflow 2: RUNTIME (webhook, per event)                            │
 │    POST /hr-event ──► embed query ──► retrieve top-3                 │

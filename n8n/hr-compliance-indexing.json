@@ -1,0 +1,160 @@
+{
+  "name": "HR Compliance — Indexing",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "ba533a35-23a9-49b3-beaa-a245c2b9c28b",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-380, 0],
+      "parameters": {}
+    },
+    {
+      "id": "037da309-9f63-4604-8593-b131da5cdcd3",
+      "name": "Reindex Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-380, 200],
+      "webhookId": "673471ca-b59f-4e88-81a2-ed332178f9bb",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reindex-policies",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "b42febdf-b60b-425c-b1b5-cdca65307223",
+      "name": "Read Policy Files",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [-160, 0],
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/policies/*.md",
+        "options": {}
+      }
+    },
+    {
+      "id": "63320af3-ef25-4c6d-8e95-a13ee62c4612",
+      "name": "Extract Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [60, 0],
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "destinationKey": "policyText",
+        "options": {
+          "keepSource": "both"
+        }
+      }
+    },
+    {
+      "id": "38638458-7a5d-4d84-8219-60a0cc6bba98",
+      "name": "Prepare Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 0],
+      "parameters": {
+        "jsCode": "// sourceDocument is the citation Claude must emit, so the bare filename\n// has to survive from the file read all the way into chunk metadata.\nreturn $input.all().map((item) => {\n  const filePath = item.binary?.data?.fileName ?? 'unknown.md';\n  return {\n    json: {\n      policyText: item.json.policyText,\n      docName: filePath.split('/').pop(),\n    },\n  };\n});"
+      }
+    },
+    {
+      "id": "d83a3a6c-a878-4c63-ad78-5ef096623c14",
+      "name": "Simple Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [520, 0],
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "hr_policies"
+        },
+        "clearStore": true,
+        "embeddingBatchSize": 200
+      }
+    },
+    {
+      "id": "74e2e562-e8a8-468b-adb3-d8bdd5c0ed72",
+      "name": "Embeddings Google Gemini",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [440, 220],
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "JsG3RwahegrJknx0",
+          "name": "Gemini - HR Agent"
+        }
+      }
+    },
+    {
+      "id": "6f14c397-9c69-4e48-92e8-9e98dcf2f71e",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [660, 220],
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.policyText }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "sourceDocument",
+                "value": "={{ $json.docName }}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "a710bbc4-f75a-4d58-ac93-1706979d21b0",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [660, 440],
+      "parameters": {
+        "chunkSize": 1000,
+        "chunkOverlap": 200,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [[{ "node": "Read Policy Files", "type": "main", "index": 0 }]]
+    },
+    "Reindex Webhook": {
+      "main": [[{ "node": "Read Policy Files", "type": "main", "index": 0 }]]
+    },
+    "Read Policy Files": {
+      "main": [[{ "node": "Extract Text", "type": "main", "index": 0 }]]
+    },
+    "Extract Text": {
+      "main": [[{ "node": "Prepare Documents", "type": "main", "index": 0 }]]
+    },
+    "Prepare Documents": {
+      "main": [[{ "node": "Simple Vector Store", "type": "main", "index": 0 }]]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [[{ "node": "Simple Vector Store", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Default Data Loader": {
+      "ai_document": [[{ "node": "Simple Vector Store", "type": "ai_document", "index": 0 }]]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [[{ "node": "Default Data Loader", "type": "ai_textSplitter", "index": 0 }]]
+    }
+  }
+}

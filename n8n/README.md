@@ -1,12 +1,12 @@
 # n8n Workflows
 
-> Workflow JSON is not exported yet — see [Current state](../README.md#current-state).
+> `hr-compliance-indexing.json` is deployed and verified. The runtime workflow is not built yet.
 
 Two workflows share one in-memory vector store.
 
 | File | Trigger | Purpose |
 |---|---|---|
-| `hr-compliance-indexing.json` | Manual | Read `/home/node/policies/*.md`, chunk, embed, insert |
+| `hr-compliance-indexing.json` | Manual | Read `/home/node/.n8n-files/policies/*.md`, chunk, embed, insert |
 | `hr-compliance-runtime.json` | Webhook `POST /hr-event` | Retrieve top-3, draft plan, validate via Java, respond |
 
 ## Importing

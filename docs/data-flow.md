@@ -14,7 +14,7 @@ Manual Trigger
       │ main
       ▼
 Read Policy Files              n8n-nodes-base.readWriteFile
-  /policies/*.md               → one binary item per file
+  ~/.n8n-files/policies/*.md   → one binary item per file
       │ main
       ▼
 Extract From File              n8n-nodes-base.extractFromFile
@@ -48,7 +48,7 @@ chunk, and retrieval starts returning duplicates that crowd out the top-k. With 
 is safely re-runnable.
 
 **Why the Code node:** `ReadWriteFile` returns the full container path
-(`/policies/termination.md`), but the citation needs the bare filename (`termination.md`). The
+(`/home/node/.n8n-files/policies/termination.md`), but the citation needs the bare filename (`termination.md`). The
 Code node does that mapping and is the only place the two representations meet.
 
 ---

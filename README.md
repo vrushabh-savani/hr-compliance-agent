@@ -149,7 +149,7 @@ API keys live only inside n8n as credentials and are never stored in this repo.
 | ✅ | Policy corpus, JSON contracts, architecture docs |
 | ✅ | Policies mounted into the n8n container (read-only) |
 | ✅ | **Java validation + execution service — complete and verified** |
-| 🔜 | n8n indexing workflow |
+| ✅ | **n8n indexing workflow — 11 chunks indexed, every chunk carries its source citation** |
 | 🔜 | n8n runtime workflow |
 | 🔜 | End-to-end and adversarial test scripts |
 

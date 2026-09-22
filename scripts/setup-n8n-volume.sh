@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Recreate the n8n container with policies/ bind-mounted read-only at /home/node/policies.
+# Recreate the n8n container with policies/ bind-mounted read-only under ~/.n8n-files.
 #
 # Docker cannot add a mount to a running container, so the container must be replaced.
 # This is safe: all n8n state (workflows, credentials, encryption key, API keys) lives in
@@ -17,10 +17,11 @@ CONTAINER="n8n"
 VOLUME="n8n_data"
 IMAGE="n8nio/n8n:latest"
 
-# Mounted under /home/node rather than /policies on purpose. On n8n Cloud the Read/Write File
-# node refuses any path outside /home/node/. Self-hosted has no such restriction, but using the
-# cloud-safe path costs nothing and keeps the workflow portable.
-MOUNT_PATH="/home/node/policies"
+# Must live under ~/.n8n-files. n8n 2.x defaults N8N_RESTRICT_FILE_ACCESS_TO to '~/.n8n-files',
+# and the Read/Write File node throws "Access to the file is not allowed." for anything outside
+# it. Subdirectories are fine. Overriding the env var would also work, but using the documented
+# default keeps this portable to n8n Cloud, where the override isn't available.
+MOUNT_PATH="/home/node/.n8n-files/policies"
 
 if [[ ! -d "${POLICIES_DIR}" ]]; then
   echo "error: ${POLICIES_DIR} does not exist" >&2
